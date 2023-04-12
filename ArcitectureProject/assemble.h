@@ -28,6 +28,8 @@ struct instruction {
     int PC;
 };
 
+int isLabel(const char *);
+
 char *instructions[] = {"add", "sub", "slt", "or", "nand",
                         "addi", "slti", "ori", "lui", "lw", "sw", "beq", "jalr",
                         "j", "halt"};

@@ -42,6 +42,11 @@ void main(int argc, char **argv) {
     pSymTab = (struct symbolTable *) malloc(symTabLen * sizeof(struct symbolTable));
     for (i = 0; i < symTabLen; i++) pSymTab[i].symbol = (char *) malloc(7);
     fillSymTab(pSymTab, assp);
+
+    for (int k = 0; k < symTabLen; ++k) {
+        printf("%s - %d\n", pSymTab[k].symbol, pSymTab[i].value);
+    }
+
     fclose(assp);
     fclose(machp);
 }
@@ -49,18 +54,16 @@ void main(int argc, char **argv) {
 int findSymTabLen(FILE *inputFile) {
     int count = 0;
     int lineSize = 72;
-    char line[72];
+    char line[lineSize];
     while (fgets(line, lineSize, inputFile)) {
         if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n'));
         else {
             char *copy = (char *) malloc(sizeof(char) * 72);
             strcpy(copy, line);
             char *token = strtok(copy, "\t, ");
-            for (int i = 0; i < 15; ++i)
-                if (strcmp(instructions[i], token) == 0)
-                    count++;
+            if (isLabel(token)) count++;
         }
-        printf("%s", line);
+//        printf("%s", line);
     }
     rewind(inputFile);
     return count;
@@ -76,17 +79,23 @@ int fillSymTab(struct symbolTable *symT, FILE *inputFile) {
         if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n'));
         else {
             token = strtok(line, "\t, ");
-            for (int j = 0; j < 15; ++j) {
-                if (instructions[i] == token) {
-                    strcpy(symT[i].symbol, token);
-                    symT[i++].value = lineNo++;
-                }
+            if (isLabel(token)) {
+                strcpy(symT[i].symbol, token);
+                symT[i++].value = lineNo++;
             }
+
         }
 //        lineNo++;
     }
     rewind(inputFile);
     return lineNo;
+}
+
+int isLabel(const char *s) {
+    for (int i = 0; i < 15; ++i) {
+        if (instructions[i] == s) return 0;
+    }
+    return 1;
 }
 
 void formInst(struct instruction *instSet, FILE *file) {
