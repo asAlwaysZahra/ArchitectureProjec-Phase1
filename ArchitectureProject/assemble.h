@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define NORTYPE 5
 #define NOITYPE 8
@@ -30,6 +31,9 @@ struct instruction {
 
 int isLabel(const char *);
 
+char hexTable[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A',
+                     'B', 'C', 'D', 'E', 'F'};
+
 char *instructions[] = {"add", "sub", "slt", "or", "nand",
                         "addi", "slti", "ori", "lui", "lw", "sw", "beq", "jalr",
                         "j", "halt"};
@@ -38,7 +42,7 @@ int findSymTabLen(FILE *);
 
 int fillSymTab(struct symbolTable *, FILE *);
 
-void formInst(struct instruction *, FILE *);
+void formInst(FILE *, FILE *, struct symbolTable *, int symTabLen);
 
 int hex2int(char *);
 

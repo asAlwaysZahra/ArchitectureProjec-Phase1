@@ -1,3 +1,0 @@
-C:/Users/feres/CLionProjects/ArcitectureProject/cmake-build-debug/CMakeFiles/ArcitectureProject.dir
-C:/Users/feres/CLionProjects/ArcitectureProject/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/feres/CLionProjects/ArcitectureProject/cmake-build-debug/CMakeFiles/rebuild_cache.dir
