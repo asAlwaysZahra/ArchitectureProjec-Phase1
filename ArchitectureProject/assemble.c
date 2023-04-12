@@ -5,6 +5,7 @@ void main(int argc, char **argv) {
     struct symbolTable *pSymTab;
     int symTabLen;
 
+    // first, check if input and output files are correct, can be opened and are readable
     if (argc < 3) {
         printf("***** Please run this program as follows:\n");
         printf("***** %s assprog.as machprog.m\n", argv[0]);
@@ -28,14 +29,26 @@ void main(int argc, char **argv) {
      * ********************************************* *
      * ********************************************* *
      *************************************************/
+    // find number of symbols
     symTabLen = findSymTabLen(assp);
+    // allocate memory for the array of symbols
     pSymTab = (struct symbolTable *) malloc(symTabLen * sizeof(struct symbolTable));
+    // allocate memory for strings in symbol table
     for (int i = 0; i < symTabLen; i++) pSymTab[i].symbol = (char *) malloc(7);
+    // fill symbol table with symbols and their address
     fillSymTab(pSymTab, assp);
+    // print symbol table
+    printf("---- symbol table ----\n");
+    for (int i = 0; i < symTabLen; i++) {
+        printf("      %d - %s\n", pSymTab[i].value, pSymTab[i].symbol);
+    }
+    printf("----------------------\n");
+    // form instructions in input file and write their decimal values in output file
     formInst(assp, machp, pSymTab, symTabLen);
-
+    // close files
     fclose(assp);
     fclose(machp);
+    exit(0);
 }
 
 int findSymTabLen(FILE *inputFile) {
@@ -43,14 +56,13 @@ int findSymTabLen(FILE *inputFile) {
     int lineSize = 72;
     char line[lineSize];
     while (fgets(line, lineSize, inputFile)) {
-        if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n'));
+        if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n') || (line[0] == '#'));
         else {
             char *copy = (char *) malloc(sizeof(char) * 72);
             strcpy(copy, line);
             char *token = strtok(copy, "\t, ");
             if (isLabel(token)) count++;
         }
-//        printf("%s", line);
     }
     rewind(inputFile);
     return count;
@@ -62,7 +74,7 @@ int fillSymTab(struct symbolTable *symT, FILE *inputFile) {
     char line[lineSize];
     int i = 0;
     while (fgets(line, lineSize, inputFile)) {
-        if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n'));
+        if ((line[0] == ' ') || (line[0] == '\t') || (line[0] == '\n') || (line[0] == '#'));
         else {
             char *token = strtok(line, "\t, ");
             if (isLabel(token)) {
@@ -72,7 +84,6 @@ int fillSymTab(struct symbolTable *symT, FILE *inputFile) {
                 i++;
             }
         }
-//        printf("%d - %d - %s\n", lineNo, symT[i].value, symT[i].symbol);
         lineNo++;
     }
     rewind(inputFile);
@@ -85,9 +96,14 @@ int isLabel(const char *s) {
     return 1;
 }
 
-bool isNumeric(const char *token) {
-    char c = token[0];
-    return c >= '0' && c <= '9' || c == '-';
+bool isNumeric(const char *s) {
+    char c = s[0];
+    for (int i = 0; c != '\0'; ++i) {
+        c = s[i];
+        if (c >= '0' && c <= '9' || c == '-')
+            return true;
+    }
+    return false;
 }
 
 void formInst(FILE *input, FILE *output, struct symbolTable *pSymTab, int symTabLen) {
@@ -101,8 +117,8 @@ void formInst(FILE *input, FILE *output, struct symbolTable *pSymTab, int symTab
     for (i = 0; i < symTabLen - 1; i++) {
         for (int j = i + 1; j < symTabLen; j++) {
             if (strcmp(pSymTab[i].symbol, pSymTab[j].symbol) == 0) {
-                printf("Duplicate Label '%s' in lines: %d and %d\n",
-                       pSymTab[i].symbol, pSymTab[i].value, pSymTab[j].value);
+                fprintf(output, "Duplicate Label '%s' in lines: %d and %d\n",
+                        pSymTab[i].symbol, pSymTab[i].value + 1, pSymTab[j].value + 1);
                 exit(1);
             }
         }
@@ -111,12 +127,12 @@ void formInst(FILE *input, FILE *output, struct symbolTable *pSymTab, int symTab
     currInst->mnemonic = (char *) malloc(7); // each mnemonic is at most 6 characters
 
     while (fgets(line, lineSize, input)) {
+        noInsts++;
 
         // if line is empty
-        if (line[0] == '\n') continue;
+        if ((line[0] == '\n') || (line[0] == '#')) continue;
 
-        noInsts++;
-        printf("\n131: line: %s", line);
+        printf("\n%d: %s", noInsts, line);
         currInst->PC = instCnt++;
 
         // initialize 8 parts of instruction with 0
@@ -150,9 +166,10 @@ void formInst(FILE *input, FILE *output, struct symbolTable *pSymTab, int symTab
                     }
                 }
 
-                // invalid label
+                // undefined label
                 if (!found) {
-                    printf("\n161: Invalid Label\n");
+                    printf("\nInvalid Label '%s' in line %d\n", token, noInsts);
+                    fprintf(output, "\nERROR: Invalid Label '%s' in line %d\n", token, noInsts);
                     exit(1);
                 }
 
@@ -168,133 +185,149 @@ void formInst(FILE *input, FILE *output, struct symbolTable *pSymTab, int symTab
                 currInst->inst[7] = *(lower + 3);
                 currInst->inst[8] = '\0';
                 long result = hex2int(currInst->inst);
-                printf("--.fill:\n%li\n", result);
+                printf("%li\n", result);
                 fprintf(output, "%li\n", result);
             }
             continue;
         }
 
-            // if the line is not a directive
-        else {
-            for (i = 0; i < 15; i++) {
-                if (strcmp(currInst->mnemonic, instructions[i]) == 0) {
-                    currInst->intInst = i;
-                    break;
-                }
+        // check .space directive
+        if (strcmp(currInst->mnemonic, ".space") == 0) {
+            int count = 0;
+            while (token != NULL) {
+                token = strtok(NULL, delim);
+                count++;
             }
-
-            // invalid op code
-            if (i == 15) {
-                printf("\n172: Invalid opcode\n");
-                exit(1);
-            }
-
-            currInst->instType = -1;
-
-            if (i < 5) {
-                currInst->instType = RTYPE;
-                currInst->rd = atoi(strtok(NULL, delim));
-                currInst->rs = atoi(strtok(NULL, delim));
-                currInst->rt = atoi(strtok(NULL, delim));
-            } else if (i < 13) {
-                currInst->instType = ITYPE;
-                currInst->rd = 0;
-                currInst->rt = atoi(strtok(NULL, delim));
-                currInst->rs = atoi(strtok(NULL, delim));
-
-                if (strcmp(token, "lui") == 0)
-                    currInst->rs = 0;
-
-                char *token2 = strtok(NULL, delim);
-
-                if (strcmp(token, "jalr") == 0)
-                    currInst->imm = 0;
-                else if (isNumeric(token2))
-                    currInst->imm = atoi(token2);
-                else {
-                    for (i = 0; i < symTabLen; i++) {
-                        if (strcmp(pSymTab[i].symbol, token2) == 0) {
-                            currInst->imm = pSymTab[i].value;
-                            break;
-                        }
-                    }
-                    // invalid label
-                    if (symTabLen == i) {
-                        printf("\n203: Invalid Label\n");
-                        exit(1);
-                    }
-                }
-
-                if (strcmp(token, "beq") == 0) {
-                    int temp;
-                    currInst->imm = currInst->imm - currInst->PC - 1;
-                    temp = currInst->rs;
-                    currInst->rs = currInst->rt;
-                    currInst->rt = temp;
-                }
-
-            } else if (i < 15) {
-                currInst->instType = JTYPE;
-                currInst->rd = 0;
-                currInst->rt = 0;
-                currInst->rs = 0;
-                if (strcmp(token, "j") == 0) {
-                    token = strtok(NULL, delim);
-                    // find symbol address
-                    for (i = 0; i < symTabLen; i++) {
-                        if (strcmp(pSymTab[i].symbol, token) == 0) {
-                            currInst->imm = pSymTab[i].value;
-                            break;
-                        }
-                    }
-                    // invalid label
-                    if (symTabLen == i) {
-                        printf("\n228: Invalid Label\n");
-                        exit(1);
-                    }
-                } else if (strcmp(token, "halt") == 0)
-                    currInst->imm = 0;
-
-            } else {
-                printf("\n233: error in instruction num\n");
-            }
-
-            // check if offset can be placed in 16 bit
-            if (currInst->imm > 32767 || currInst->imm < -32768) {
-                printf("\n237: Invalid offset\n");
-                exit(1);
-            }
-
-            // hear, we convert 8 parts of instruction to 32 bit -----------------------------------------------------------
-            currInst->inst[1] = hexTable[currInst->intInst];
-            switch (currInst->instType) {
-                case RTYPE:
-                    currInst->inst[2] = hexTable[currInst->rs];
-                    currInst->inst[3] = hexTable[currInst->rt];
-                    currInst->inst[4] = hexTable[currInst->rd];
-                    break;
-                case ITYPE:
-                    currInst->inst[2] = hexTable[currInst->rs];
-                    currInst->inst[3] = hexTable[currInst->rt];
-                    int2hex16(lower, currInst->imm);
-                    currInst->inst[4] = *(lower + 0);
-                    currInst->inst[5] = *(lower + 1);
-                    currInst->inst[6] = *(lower + 2);
-                    currInst->inst[7] = *(lower + 3);
-                    break;
-                default:
-                    int2hex16(lower, currInst->imm);
-                    currInst->inst[4] = *(lower + 0);
-                    currInst->inst[5] = *(lower + 1);
-                    currInst->inst[6] = *(lower + 2);
-                    currInst->inst[7] = *(lower + 3);
-                    break;
-            }
-            currInst->inst[8] = '\0';
-            long result = hex2int(currInst->inst);
-            printf("%li\n", result);
-            fprintf(output, "%li\n", result);
+            continue;
         }
+
+        // if the line is not a directive
+        for (i = 0; i < 15; i++) {
+            if (strcmp(currInst->mnemonic, instructions[i]) == 0) {
+                currInst->intInst = i;
+                break;
+            }
+        }
+
+        // invalid instruction and op code
+        if (i == 15) {
+            printf("\nInvalid opcode for instruction '%s' in line %d\n", currInst->mnemonic, noInsts);
+            fprintf(output, "\nERROR: Invalid opcode for instruction '%s' in line %d\n",
+                    currInst->mnemonic, noInsts);
+            exit(1);
+        }
+
+        currInst->instType = -1;
+
+        // assign different parts of instruction structure based on its inst type
+        if (i < 5) {
+            currInst->instType = RTYPE;
+            currInst->rd = atoi(strtok(NULL, delim));
+            currInst->rs = atoi(strtok(NULL, delim));
+            currInst->rt = atoi(strtok(NULL, delim));
+            currInst->imm = 0;
+        } else if (i < 13) {
+            currInst->instType = ITYPE;
+            currInst->rd = 0;
+            currInst->rt = atoi(strtok(NULL, delim));
+            if (strcmp(token, "lui") == 0)
+                currInst->rs = 0;
+            else
+                currInst->rs = atoi(strtok(NULL, delim));
+
+            char *token2 = strtok(NULL, delim);
+
+            if (strcmp(token, "jalr") == 0)
+                currInst->imm = 0;
+            else if (isNumeric(token2))
+                currInst->imm = atoi(token2);
+            else {
+                for (i = 0; i < symTabLen; i++) {
+                    if (strcmp(pSymTab[i].symbol, token2) == 0) {
+                        currInst->imm = pSymTab[i].value;
+                        break;
+                    }
+                }
+                // invalid label
+                if (symTabLen == i) {
+                    printf("\nInvalid Label '%s' in line %d\n", token2, noInsts);
+                    fprintf(output, "\nERROR: Invalid Label '%s' in line %d\n", token2, noInsts);
+                    exit(1);
+                }
+            }
+
+            if (strcmp(token, "beq") == 0) {
+                int temp;
+                currInst->imm = currInst->imm - currInst->PC - 1;
+                temp = currInst->rs;
+                currInst->rs = currInst->rt;
+                currInst->rt = temp;
+            }
+
+        } else {
+            currInst->instType = JTYPE;
+            currInst->rd = 0;
+            currInst->rt = 0;
+            currInst->rs = 0;
+            if (strcmp(token, "j") == 0) {
+                token = strtok(NULL, delim);
+                // find symbol address
+                for (i = 0; i < symTabLen; i++) {
+                    if (strcmp(pSymTab[i].symbol, token) == 0) {
+                        currInst->imm = pSymTab[i].value;
+                        break;
+                    }
+                }
+                // invalid label
+                if (symTabLen == i) {
+                    printf("\nInvalid Label '%s' in line %d\n", token, noInsts);
+                    fprintf(output, "\nERROR: Invalid Label '%s' in line %d\n", token, noInsts);
+                    exit(1);
+                }
+            } else
+                currInst->imm = 0;
+        }
+
+        // check if offset can be placed in 16 bit
+        if (currInst->imm > 32767 || currInst->imm < -32768) {
+            printf("\nInvalid Offset '%d' in line %d\n", currInst->imm, noInsts);
+            fprintf(output, "\nERROR: Invalid Offset '%d' in line %d\n", currInst->imm, noInsts);
+            exit(1);
+        }
+
+        // hear, we convert 8 parts of instruction to 32 bit
+        currInst->inst[1] = hexTable[currInst->intInst]; // bit 1 for op code in hex
+        switch (currInst->instType) {
+            case RTYPE:
+                currInst->inst[2] = hexTable[currInst->rs];
+                currInst->inst[3] = hexTable[currInst->rt];
+                currInst->inst[4] = hexTable[currInst->rd];
+                // other are 0 by default
+                break;
+            case ITYPE:
+                currInst->inst[2] = hexTable[currInst->rs];
+                currInst->inst[3] = hexTable[currInst->rt];
+                int2hex16(lower, currInst->imm);
+                currInst->inst[4] = *(lower + 0);
+                currInst->inst[5] = *(lower + 1);
+                currInst->inst[6] = *(lower + 2);
+                currInst->inst[7] = *(lower + 3);
+                break;
+            default:
+                int2hex16(lower, currInst->imm);
+                currInst->inst[4] = *(lower + 0);
+                currInst->inst[5] = *(lower + 1);
+                currInst->inst[6] = *(lower + 2);
+                currInst->inst[7] = *(lower + 3);
+                break;
+        }
+        // last character must be 0
+        currInst->inst[8] = '\0';
+        // convert hex inst to decimal value
+        long result = hex2int(currInst->inst);
+        printf("%li\n", result);
+        // write result in file
+        fprintf(output, "%li\n", result);
     }
 
     fclose(input);
